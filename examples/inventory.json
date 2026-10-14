@@ -1,0 +1,22 @@
+{
+  "complete": true,
+  "listings": [
+    {
+      "stock": "DEMO-101",
+      "year": 1987,
+      "model": "Mazda RX7",
+      "part": "Transmission",
+      "description": "5-speed manual, naturally aspirated",
+      "dealer": "Example Recycler",
+      "city": "Worcester",
+      "state": "MA",
+      "price": 650,
+      "miles": 92000,
+      "grade": "B",
+      "distance": 25,
+      "phone": "",
+      "image": null,
+      "url": null
+    }
+  ]
+}

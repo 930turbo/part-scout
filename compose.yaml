@@ -1,0 +1,28 @@
+services:
+  scout:
+    build: .
+    restart: unless-stopped
+    ports: ['127.0.0.1:4310:4310']
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN to a random value of at least 24 characters}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      CAR_PART_ENABLED: ${CAR_PART_ENABLED:-false}
+      FEED_HOSTS: ${FEED_HOSTS:-}
+    volumes: ['scout-data:/app/data']
+  bot:
+    build: .
+    profiles: ['discord']
+    restart: unless-stopped
+    command: ['node', 'dist/bot.js']
+    environment:
+      SCOUT_API_URL: http://scout:4310
+      SCOUT_ALLOW_CONTAINER_HTTP: 'true'
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      DISCORD_USER_IDS: ${DISCORD_USER_IDS:-}
+    depends_on:
+      scout:
+        condition: service_healthy
+volumes:
+  scout-data:
