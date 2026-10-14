@@ -9,10 +9,16 @@ import {
   type Monitor,
   type MonitorInput,
   type Settings,
+  monitorSchema,
+  listingSchema,
 } from './model.js';
 
 export type Row = Record<string, any>;
 export function fingerprint(l: Listing): string {
+  if (l.sourceId)
+    return createHash('sha256')
+      .update(JSON.stringify([l.source.toLowerCase(), l.sourceId]))
+      .digest('hex');
   return createHash('sha256')
     .update(
       JSON.stringify(
@@ -42,7 +48,17 @@ export class Store {
       CREATE INDEX IF NOT EXISTS idx_prices_listing ON prices(listing_id,at);
       CREATE INDEX IF NOT EXISTS idx_jobs_due ON jobs(status,due);
       CREATE INDEX IF NOT EXISTS idx_runs_started ON runs(started);
+      CREATE TABLE IF NOT EXISTS cars(id INTEGER PRIMARY KEY,config TEXT NOT NULL,created INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS checklist(id INTEGER PRIMARY KEY,car_id INTEGER NOT NULL REFERENCES cars(id) ON DELETE CASCADE,config TEXT NOT NULL,updated INTEGER NOT NULL);
       INSERT OR IGNORE INTO meta VALUES('schema','1');`);
+    const matchColumns = this.db.prepare('PRAGMA table_info(matches)').all() as Row[];
+    for (const column of ['first_seen', 'last_seen'])
+      if (!matchColumns.some((c) => c.name === column))
+        this.db.exec(`ALTER TABLE matches ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
+    this.db
+      .exec(`UPDATE matches SET first_seen=(SELECT first_seen FROM listings WHERE id=listing_id) WHERE first_seen=0;
+      UPDATE matches SET last_seen=(SELECT last_seen FROM listings WHERE id=listing_id) WHERE last_seen=0;
+      INSERT OR REPLACE INTO meta VALUES('schema','2');`);
     // This server owns a single worker. Recover notifications interrupted during delivery.
     this.db.prepare("UPDATE jobs SET status='pending' WHERE status='sending'").run();
   }
@@ -86,7 +102,7 @@ export class Store {
   }
   monitors(): Monitor[] {
     return this.all('SELECT * FROM monitors ORDER BY id').map((r) => ({
-      ...JSON.parse(r.config),
+      ...monitorSchema.parse(JSON.parse(r.config)),
       id: r.id,
       lastRun: r.last_run,
       nextRun: r.next_run,
@@ -167,7 +183,7 @@ export class Store {
     const limit = Math.min(100, Math.max(1, options.limit || 30));
     const page = Math.max(1, options.page || 1);
     const items = this.all(
-      `SELECT l.*, (SELECT MAX(m.missed<3) FROM matches m WHERE m.listing_id=l.id) active FROM listings l WHERE ${where} ORDER BY ${sort},l.id LIMIT ? OFFSET ?`,
+      `SELECT l.*, (SELECT MAX(m.missed<3) FROM matches m WHERE m.listing_id=l.id) active,(SELECT json_group_array(m.monitor_id) FROM matches m WHERE m.listing_id=l.id) monitors FROM listings l WHERE ${where} ORDER BY ${sort},l.id LIMIT ? OFFSET ?`,
       ...args,
       limit,
       (page - 1) * limit,
@@ -176,13 +192,14 @@ export class Store {
   }
   listingRow(r: Row) {
     return {
-      ...JSON.parse(r.data),
+      ...listingSchema.parse(JSON.parse(r.data)),
       id: r.id,
       firstSeen: r.first_seen,
       lastSeen: r.last_seen,
       saved: !!r.saved,
       note: r.note,
       active: !!r.active,
+      monitors: r.monitors ? JSON.parse(r.monitors) : [],
     };
   }
   detail(id: string) {
@@ -229,11 +246,13 @@ export class Store {
           now,
         );
         this.exec(
-          'INSERT INTO matches(monitor_id,listing_id,eligible,observed_price) VALUES(?,?,?,?) ON CONFLICT(monitor_id,listing_id) DO UPDATE SET missed=0,eligible=excluded.eligible,observed_price=excluded.observed_price',
+          'INSERT INTO matches(monitor_id,listing_id,eligible,observed_price,first_seen,last_seen) VALUES(?,?,?,?,?,?) ON CONFLICT(monitor_id,listing_id) DO UPDATE SET missed=0,eligible=excluded.eligible,observed_price=excluded.observed_price,last_seen=excluded.last_seen',
           m.id,
           id,
           Number(eligible),
           l.price,
+          now,
+          now,
         );
         let historyId: number | null = null;
         if (!previous || previous.price !== l.price)
@@ -327,5 +346,79 @@ export class Store {
   }
   close() {
     this.db.close();
+  }
+  garage() {
+    return this.getMeta('garage', { name: 'Your garage', owner: '', zip: '' });
+  }
+  getMeta<T>(key: string, fallback: T): T {
+    const row = this.get('SELECT value FROM meta WHERE key=?', key);
+    return row ? JSON.parse(row.value) : fallback;
+  }
+  setMeta(key: string, value: unknown) {
+    this.exec(
+      'INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+      key,
+      JSON.stringify(value),
+    );
+  }
+  cars() {
+    return this.all('SELECT * FROM cars ORDER BY id').map((r) => ({
+      ...JSON.parse(r.config),
+      id: r.id,
+      checklist: this.all('SELECT * FROM checklist WHERE car_id=? ORDER BY id', r.id).map((p) => ({
+        ...JSON.parse(p.config),
+        id: p.id,
+        updated: p.updated,
+      })),
+    }));
+  }
+  putCar(config: unknown, id?: number) {
+    if (id) {
+      if (!this.get('SELECT id FROM cars WHERE id=?', id)) throw new Error('Car not found');
+      this.exec('UPDATE cars SET config=? WHERE id=?', JSON.stringify(config), id);
+    } else
+      id = Number(
+        this.exec(
+          'INSERT INTO cars(config,created) VALUES(?,?)',
+          JSON.stringify(config),
+          Date.now(),
+        ).lastInsertRowid,
+      );
+    return this.cars().find((c) => c.id === id);
+  }
+  putChecklist(carId: number, config: unknown, id?: number) {
+    if (!this.get('SELECT id FROM cars WHERE id=?', carId)) throw new Error('Car not found');
+    if (id) {
+      const result = this.exec(
+        'UPDATE checklist SET config=?,updated=? WHERE id=? AND car_id=?',
+        JSON.stringify(config),
+        Date.now(),
+        id,
+        carId,
+      );
+      if (!result.changes) throw new Error('Checklist entry not found');
+    } else
+      id = Number(
+        this.exec(
+          'INSERT INTO checklist(car_id,config,updated) VALUES(?,?,?)',
+          carId,
+          JSON.stringify(config),
+          Date.now(),
+        ).lastInsertRowid,
+      );
+    return { id };
+  }
+  monitorExport(id: number, from: number, to: number) {
+    return this.all(
+      'SELECT l.*,m.first_seen found_at,m.last_seen observed_at,m.missed FROM listings l JOIN matches m ON m.listing_id=l.id WHERE m.monitor_id=? AND m.eligible=1 AND m.first_seen>=? AND m.first_seen<? ORDER BY m.first_seen DESC',
+      id,
+      from,
+      to,
+    ).map((r) => ({
+      ...this.listingRow(r),
+      foundAt: r.found_at,
+      observedAt: r.observed_at,
+      active: r.missed < 3,
+    }));
   }
 }

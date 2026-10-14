@@ -1,5 +1,13 @@
 # Operations
 
+## Desktop storage
+
+The portable app stores its workspace under Electron's Windows user-data directory, normally `%APPDATA%\Part Scout`. Use **Settings → Open data folder** to get the exact path. SQLite, uploaded vehicle photos, and encrypted credentials remain outside the executable. Replacing the executable does not replace the workspace.
+
+Quit from the tray before making a backup. Include the entire data folder. Windows-protected credentials are tied to the user profile; reconnect them after moving to a different user or machine. The server edition uses a private `.vault-key` beside its database; retain that key in secure backups if UI credentials were saved there.
+
+Source/server workspaces and desktop workspaces are separate unless you deliberately copy a full backup. The public executable never contains a user's configured webhook, tokens, garage records, or uploaded photos.
+
 ## Configuration
 
 | Variable                 | Purpose                                                     |

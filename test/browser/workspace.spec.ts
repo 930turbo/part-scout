@@ -11,6 +11,9 @@ test('dashboard, inventory, history, notes, filters and settings', async ({ page
   await expect(page.locator('.listing-card')).toHaveCount(6);
   await expect(page.getByText('SAMPLE WORKSPACE')).toBeVisible();
   mkdirSync('docs/images', { recursive: true });
+  await page.locator('.part-preview img').evaluateAll(async (images) => {
+    await Promise.all(images.map((img) => (img as HTMLImageElement).decode().catch(() => {})));
+  });
   await page.screenshot({ path: 'docs/images/overview.png', fullPage: true });
   await page
     .getByRole('navigation', { name: 'Main navigation' })

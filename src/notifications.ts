@@ -43,10 +43,15 @@ export function webhookDestinations(
   if (validWebhook(defaultUrl)) destinations.default = defaultUrl;
   return destinations;
 }
-const money = (n: number | null) =>
+const money = (n: number | null, currency = 'USD') =>
   n === null
     ? 'Ask for price'
-    : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    : new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(n);
 const clean = (s: string, max = 1000) => s.replace(/([*_`~|>\\])/g, '\\$1').slice(0, max);
 export function embed(payload: any) {
   const l = payload.listing;
@@ -65,8 +70,8 @@ export function embed(payload: any) {
         name: 'Price',
         value:
           payload.kind === 'price-drop'
-            ? `${money(payload.previousPrice)} → ${money(l.price)}`
-            : money(l.price),
+            ? `${money(payload.previousPrice, l.currency || 'USD')} → ${money(l.price, l.currency || 'USD')}`
+            : money(l.price, l.currency || 'USD'),
         inline: true,
       },
       {
@@ -91,12 +96,15 @@ export class Notifications {
     private store: Store,
     url = process.env.DISCORD_WEBHOOK_URL || '',
     private request: typeof fetch = fetch,
-    private destinations: Record<string, string> = webhookDestinations(url),
+    private destinations:
+      Record<string, string> | (() => Record<string, string>) = webhookDestinations(url),
   ) {}
   async tick() {
+    const destinations =
+      typeof this.destinations === 'function' ? this.destinations() : this.destinations;
     if (
       this.running ||
-      !Object.keys(this.destinations).length ||
+      !Object.keys(destinations).length ||
       this.store.settings().notificationMode === 'off' ||
       this.store.get("SELECT value FROM meta WHERE key='demo'")?.value === 'true'
     )
@@ -111,7 +119,7 @@ export class Notifications {
       return;
     }
     const destination = JSON.parse(first.payload).destination || 'default';
-    const url = this.destinations[destination];
+    const url = destinations[destination];
     if (!url) {
       this.store.exec(
         "UPDATE jobs SET status='failed',error=? WHERE id=?",
@@ -142,7 +150,15 @@ export class Notifications {
           signal: AbortSignal.timeout(15000),
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            allowed_mentions: { parse: [] },
+            ...(this.store.settings().phonePush && this.store.settings().discordUserId
+              ? { content: `<@${this.store.settings().discordUserId}> Parts matched your monitor.` }
+              : {}),
+            allowed_mentions: {
+              parse: [],
+              ...(this.store.settings().phonePush && this.store.settings().discordUserId
+                ? { users: [this.store.settings().discordUserId] }
+                : {}),
+            },
             embeds: jobs.map((j) => embed(JSON.parse(j.payload))),
           }),
         });

@@ -2,6 +2,21 @@ import * as cheerio from 'cheerio';
 import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { listingSchema, type Listing, type Monitor } from './model.js';
+import { Ebay, type ProviderConfig } from './ebay.js';
+import { setTimeout as delayTimer } from 'node:timers/promises';
+export function publicUrl(
+  raw: string | undefined,
+  base = 'https://car-part.com/cgi-bin/search.cgi',
+): string | null {
+  if (!raw || /^(?:javascript|mailto|tel):/i.test(raw)) return null;
+  try {
+    const u = new URL(raw, base);
+    if (!['https:', 'http:'].includes(u.protocol) || u.username || u.password) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
 
 export class ProviderError extends Error {}
 export function numberValue(text: string): number | null {
@@ -42,12 +57,34 @@ export function parseCarPart(
     const location = dealerText.match(/USA-([A-Z]{2})\s*\(([^)]+)\)/);
     const phone = dealerText.match(/(?:\+1[-\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/)?.[0] || '';
     const priceText = cells.eq(5 - offset).text();
-    const rawImage = $(tr).find('img').attr('src');
-    const image = rawImage && /^https:\/\//i.test(rawImage) ? rawImage : null;
-    const rawLink = cells
-      .eq(6 - offset)
-      .find('a[href^="http"]')
-      .attr('href');
+    const images = [
+      ...new Set(
+        [
+          ...$(tr)
+            .find('img')
+            .toArray()
+            .map((img) => publicUrl($(img).attr('src'))),
+          ...$(tr)
+            .find('a[href]')
+            .toArray()
+            .map((a) => publicUrl($(a).attr('href')))
+            .filter((u) => u && /\.(?:jpe?g|png|webp)(?:\?|$)/i.test(u)),
+        ].filter((url): url is string => !!url && url.startsWith('https://')),
+      ),
+    ];
+    const image = images[0] || null;
+    const links = $(tr)
+      .find('a[href]')
+      .toArray()
+      .map((a) => ({
+        href: publicUrl($(a).attr('href')),
+        text: $(a).text(),
+        photo: $(a).find('img').length > 0,
+      }))
+      .filter((a) => a.href);
+    const directLink = links.find((a) => a.photo || /detail|view|stock|listing/i.test(a.text));
+    const rawLink = directLink?.href || links.find((a) => !/request.?quote/i.test(a.text))?.href;
+    const email = $(tr).find('a[href^="mailto:"]').attr('href')?.slice(7).split('?')[0] || '';
     const result = listingSchema.safeParse({
       stock: cells
         .eq(4 - offset)
@@ -70,6 +107,26 @@ export function parseCarPart(
         .slice(0, 1),
       distance: numberValue(cells.eq(7 - offset).text()),
       image,
+      images,
+      source: 'Car-Part',
+      urlKind: directLink ? 'listing' : 'seller',
+      email,
+      sellerUrl: publicUrl(
+        cells
+          .eq(6 - offset)
+          .find('a[href]')
+          .first()
+          .attr('href'),
+      ),
+      attributes: {
+        'Recycler information': dealerText,
+        'Provider row': $(tr).text().replace(/\s+/g, ' ').trim(),
+      },
+      raw: {
+        cells: cells.toArray().map((cell) => $(cell).text().trim()),
+        links: links.map((link) => link.href),
+        images,
+      },
       url: rawLink || null,
     });
     if (result.success) listings.push(result.data);
@@ -106,9 +163,9 @@ export const privateAddress = (ip: string) => {
     (a === 198 && (b === 18 || b === 19))
   );
 };
-export async function validateFeedUrl(raw: string) {
+export async function validateFeedUrl(raw: string, hosts = process.env.FEED_HOSTS || '') {
   const url = new URL(raw);
-  const allowed = (process.env.FEED_HOSTS || '')
+  const allowed = hosts
     .split(',')
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean);
@@ -148,12 +205,22 @@ export async function responseText(response: Response, limit = 5_000_000): Promi
 }
 export class Providers {
   nextRequest = 0;
+  ebay: Ebay;
   constructor(
     private gap: () => number,
     private request: typeof fetch = fetch,
-  ) {}
+    private config: () => ProviderConfig = () => ({
+      carPartEnabled: process.env.CAR_PART_ENABLED === 'true',
+      feedHosts: process.env.FEED_HOSTS,
+      ebayClientId: process.env.EBAY_CLIENT_ID,
+      ebayClientSecret: process.env.EBAY_CLIENT_SECRET,
+      ebayAccessToken: process.env.EBAY_ACCESS_TOKEN,
+    }),
+  ) {
+    this.ebay = new Ebay(config, request);
+  }
   async post(form: URLSearchParams, signal?: AbortSignal) {
-    await this.wait();
+    await this.wait(signal);
     return responseText(
       await this.request('https://car-part.com/cgi-bin/search.cgi', {
         method: 'POST',
@@ -167,22 +234,23 @@ export class Providers {
       }),
     );
   }
-  async wait() {
+  async wait(signal?: AbortSignal) {
     const delay = Math.max(0, this.nextRequest - Date.now());
-    if (delay) await new Promise((r) => setTimeout(r, delay));
+    if (delay) await delayTimer(delay, undefined, { signal });
     this.nextRequest = Date.now() + this.gap() * 1000;
   }
   async scan(
     m: Monitor,
     signal?: AbortSignal,
   ): Promise<{ listings: Listing[]; complete: boolean }> {
+    if (m.provider === 'ebay') return this.ebay.scan(m, () => this.wait(signal), signal);
     if (m.provider === 'import')
       throw new ProviderError(
         'This monitor accepts file imports. Import JSON or a saved results page from the dashboard.',
       );
     if (m.provider === 'feed') {
-      const url = await validateFeedUrl(m.feedUrl);
-      await this.wait();
+      const url = await validateFeedUrl(m.feedUrl, this.config().feedHosts);
+      await this.wait(signal);
       const text = await responseText(
         await this.request(url, {
           redirect: 'error',
@@ -194,7 +262,7 @@ export class Providers {
       const listings = listingSchema.array().max(10000).parse(raw);
       return { listings, complete: Array.isArray(data) ? true : data.complete === true };
     }
-    if (process.env.CAR_PART_ENABLED !== 'true')
+    if (!this.config().carPartEnabled)
       throw new ProviderError(
         'Car-Part automated access is disabled. Enable the adapter only after obtaining permission.',
       );

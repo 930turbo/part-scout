@@ -28,6 +28,36 @@ export const listingSchema = z.object({
     .refine((v) => /^https:\/\//.test(v))
     .nullable()
     .default(null),
+  images: z
+    .array(
+      z
+        .string()
+        .url()
+        .refine((v) => /^https:\/\//.test(v)),
+    )
+    .max(30)
+    .default([]),
+  source: z.string().max(60).default('Car-Part'),
+  sourceId: z.string().max(160).default(''),
+  urlKind: z.enum(['listing', 'seller', 'search']).default('listing'),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/)
+    .default('USD'),
+  condition: z.string().max(100).default(''),
+  sellerUrl: z
+    .string()
+    .url()
+    .refine((v) => /^https?:\/\//.test(v))
+    .nullable()
+    .default(null),
+  email: z.string().max(200).default(''),
+  address: z.string().max(500).default(''),
+  buyingOptions: z.array(z.enum(['FIXED_PRICE', 'AUCTION', 'BEST_OFFER'])).default([]),
+  shipping: optionalNumber.default(null),
+  endsAt: z.string().max(60).default(''),
+  attributes: z.record(z.string(), z.string().max(2000)).default({}),
+  raw: z.record(z.string(), z.unknown()).default({}),
 });
 export type Listing = z.infer<typeof listingSchema>;
 export const monitorSchema = z
@@ -40,7 +70,14 @@ export const monitorSchema = z
     zip: z.string().regex(/^\d{5}$/),
     region: z.string().max(60).default(''),
     variant: z.string().max(150).default(''),
-    provider: z.enum(['import', 'feed', 'carpart']).default('import'),
+    provider: z.enum(['import', 'feed', 'carpart', 'ebay']).default('import'),
+    carId: z.number().int().positive().nullable().default(null),
+    referencePhoto: z
+      .string()
+      .max(1500)
+      .refine((v) => !v || /^https:\/\//.test(v))
+      .default(''),
+    keywords: z.string().max(250).default(''),
     feedUrl: z.string().max(1000).default(''),
     intervalMinutes: z.number().int().min(15).max(10080).default(60),
     pageLimit: z.number().int().min(1).max(20).default(5),
@@ -84,6 +121,16 @@ export const settingsSchema = z.object({
   requestGapSeconds: z.number().int().min(2).max(120),
   notificationMode: z.enum(['instant', 'digest', 'off']),
   digestMinutes: z.number().int().min(5).max(1440),
+  theme: z.enum(['dark', 'light', 'system']).default('dark'),
+  accent: z.enum(['mint', 'violet', 'blue', 'amber', 'rose']).default('mint'),
+  refreshSeconds: z.number().int().min(5).max(120).default(10),
+  animations: z.boolean().default(true),
+  phonePush: z.boolean().default(false),
+  discordUserId: z
+    .string()
+    .regex(/^\d{15,22}$|^$/)
+    .default(''),
+  backgroundMonitoring: z.boolean().default(true),
 });
 export type Settings = z.infer<typeof settingsSchema>;
 export const defaultSettings: Settings = {
@@ -92,7 +139,50 @@ export const defaultSettings: Settings = {
   requestGapSeconds: 10,
   notificationMode: 'instant',
   digestMinutes: 60,
+  theme: 'dark',
+  accent: 'mint',
+  refreshSeconds: 10,
+  animations: true,
+  phonePush: false,
+  discordUserId: '',
+  backgroundMonitoring: true,
 };
+const photo = z
+  .string()
+  .max(1500)
+  .refine((v) => /^https:\/\//.test(v) || /^\/media\/[\w.-]+$/.test(v));
+export const garageSchema = z.object({
+  name: text,
+  owner: z.string().max(100).default(''),
+  zip: z
+    .string()
+    .regex(/^\d{5}$|^$/)
+    .default(''),
+});
+export const carSchema = z.object({
+  nickname: text,
+  year: z.number().int().min(1900).max(2100),
+  make: text,
+  model: text,
+  trim: z.string().max(100).default(''),
+  vin: z.string().max(30).default(''),
+  notes: z.string().max(4000).default(''),
+  photos: z.array(photo).max(15).default([]),
+});
+export const checklistSchema = z.object({
+  part: text,
+  status: z.enum(['wanted', 'ordered', 'bought', 'installed']).default('wanted'),
+  budget: optionalNumber.default(null),
+  paid: optionalNumber.default(null),
+  seller: z.string().max(160).default(''),
+  listingUrl: z
+    .string()
+    .max(1500)
+    .refine((v) => !v || /^https?:\/\//.test(v))
+    .default(''),
+  purchasedAt: z.string().max(30).default(''),
+  notes: z.string().max(4000).default(''),
+});
 const tokens = (s: string) =>
   s
     .split(',')

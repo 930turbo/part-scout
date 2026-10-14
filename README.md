@@ -1,125 +1,107 @@
 # Part Scout
 
-A self-hosted workspace for used parts inventory. Track searches, compare prices, save a shortlist, and get Discord alerts when a matching part appears or its price drops.
+Your parts searches, project cars, and purchase history in one local workspace.
 
-![Part Scout dashboard with a sample workspace](docs/images/overview.png)
+[**Download the Windows app**](https://github.com/930turbo/part-scout/releases/download/v2.0.0/Part-Scout-2.0.0-Windows-x64.exe) · [Releases](https://github.com/930turbo/part-scout/releases) · [Setup guide](docs/setup.md)
 
-The screenshots show fictional sample inventory. No live stock, prices, or recycler details are implied.
+![Part Scout's dark dashboard](docs/images/overview.png)
 
-## What it does
+Screenshots use an explicitly labeled sample database. The Windows app and normal server start with a real, empty workspace. Reference photos are labeled; seller photos come from the source listing.
 
-- **Inventory dashboard:** responsive cards and tables, search, monitor filters, sorting, pagination, bookmarks, notes, and CSV export.
-- **Search profiles:** year ranges, interchange variants, price/mileage/distance caps, required and excluded keywords, states, grades, and explicit handling of unknown values.
-- **Price tracking:** stable listing identities, per-monitor observed prices, price history, and price drop alerts. One listing can match several monitors.
-- **Reliable monitoring:** one provider request at a time, global request spacing, request deadlines, failure backoff, overlap prevention, and persisted scheduling.
-- **Durable Discord alerts:** transactional outbox, retries, rate limit handling, individual messages or batches, visible failures, and manual retry. First scans establish a quiet baseline by default.
-- **Discord bot:** `/scout status`, `/scout monitors`, `/scout search`, `/scout scan`, `/scout pause`, and `/scout resume`. Commands are private and restricted to configured users in one guild.
-- **Operations:** scan history, health endpoint, configuration import/export, legacy search migration, data retention, Docker setup, and CI.
+## Start on Windows
 
-## Run locally
+1. Download `Part-Scout-2.0.0-Windows-x64.exe` from the release.
+2. Run it. No Node.js, Docker, installer, or separate browser download is needed.
+3. Open **Your garage**, name the workspace, add your car and photos, and create a parts checklist.
+4. Open **Settings** to connect Discord and an inventory source.
+5. Create a monitor or use one of the 48 part presets.
 
-Requires **Node.js 24 or newer**. SQLite ships with Node; no database service or native module build is needed.
+Requires Windows 10/11 x64. The executable includes its runtime, browser, database support, and local UI. Internet access is needed for live sources, seller pages, Discord, and optional remote images. Your garage, notes, history, local photos, and exports work offline.
+
+The executable is unsigned. Data is kept in the Windows user profile, separate from the executable. **Settings → Open data folder** shows the location. Closing the window keeps monitoring in the tray by default; **Quit Part Scout** in the tray menu stops the app. This behavior is configurable.
+
+## What you can do
+
+| Workspace         | Capabilities                                                                                                                                                                        |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Garage**        | Rename the garage, add cars and photos, keep build notes, and track wanted, ordered, bought, or installed parts with budgets, sellers, purchase dates, and amounts paid.            |
+| **Inventory**     | Search, filter, sort, bookmark, annotate, compare prices, open seller links, and click through listing photos. Full source records remain available in the details view.            |
+| **Monitors**      | Track year ranges and interchange variants; filter by price, mileage, distance, keywords, states, and grades. Link searches to a garage car. Choose from 48 part presets.           |
+| **Excel exports** | Export each monitor's eligible listings first discovered within a chosen period. Workbooks include prices, seller links, photo URLs, notes, and price changes in that period.       |
+| **Discord**       | Save and test a channel webhook inside Settings. Send new-match or price-drop alerts individually or in batches. Connect a command bot without running a separate terminal process. |
+| **Appearance**    | Dark, light, or system mode; mint, violet, blue, amber, or rose accents; configurable animations and refresh interval.                                                              |
+| **Activity**      | Watch scans and alert attempts update automatically through a live event stream. Review errors and retry failed deliveries.                                                         |
+
+## Connect Discord
+
+For alerts, a webhook is enough:
+
+1. In Discord, open your channel's **Settings → Integrations → Webhooks**.
+2. Create a webhook and copy its URL.
+3. Paste it into **Part Scout → Settings → Channel webhook URL**.
+4. Click **Send test message**. The app saves the connection and reports whether Discord accepted the message.
+
+To get mention alerts on your phone, enter your Discord user ID and enable **Mention me in Discord alerts**. Enable Discord's **Mobile Push Notifications**, select suitable channel notification settings, and allow OS notifications on your phone. Part Scout controls its mentions; Discord and the phone control whether a notification appears. See [Discord's notification guide](https://support.discord.com/hc/en-us/articles/218892547--Mobile-Notifications-Settings-101).
+
+For `/scout` commands, expand **Discord command bot** in Settings. Enter your bot token, application ID, guild ID, and allowed user IDs. Save connections, use the invite link, then click **Connect & register commands**. Commands include status, monitors, search, scan, pause, and resume. Replies are private and access is limited to the configured guild and users. The optional startup checkbox reconnects it on the next launch.
+
+Named channel destinations remain available through `DISCORD_WEBHOOKS_JSON` for source/server deployments. Alerts survive restarts and retry rate limits; failures remain visible in Activity. Delivery is at least once, so an interrupted acknowledgement can produce a duplicate.
+
+## Inventory sources
+
+### eBay
+
+Uses eBay's official Browse API. Enter production client credentials, or an application access token, in Settings and test the connection. eBay requires a developer account and API access; Part Scout does not include shared credentials.
+
+Searches retain seller links, photos, buying options, condition, shipping data, feedback, and the original API record. **Load full seller gallery** retrieves the item's detailed record and additional images. Keywords are search matches, not verified vehicle fitment.
+
+**Buy from seller** or **View / bid** opens the seller's page in an isolated window inside the Windows app. You sign in, inspect the item, and complete checkout or bidding yourself. The browser edition opens seller links in a separate tab. Part Scout does not place orders, choose bids, or handle payment details.
+
+### Car-Part
+
+Supports saved HTML imports and an authorized polling adapter. Results include stock, vehicle, part, price, mileage, grade, distance, recycler details, links, row photos, and the original cell data. Missing contact or photo fields remain visibly unknown.
+
+Car-Part's [terms](https://www.car-part.com/terms.htm) require permission for automated access. Enable the adapter in Settings after obtaining that permission. It follows recognized numbered result pages up to the monitor's limit. A capped or unrecognized page sequence stays partial, preserving unseen inventory. Direct listing links and images are retained when the page supplies them; no stock-specific link is invented when it does not.
+
+### Authorized feeds and files
+
+Import JSON inventory or a saved results page from a monitor card. [examples/inventory.json](examples/inventory.json) shows the format. HTTPS feeds can return a listing array or `{ "listings": [...], "complete": true }`. Only exact allowed hosts are accepted. Configure hosts you control or trust in Settings.
+
+Three complete successful snapshots missing a listing mark it stale. Partial snapshots and failures never age unseen inventory. First scans establish a quiet baseline unless initial alerts are enabled.
+
+## Run from source
+
+Requires Node.js 24 or newer.
 
 ```sh
 git clone https://github.com/930turbo/part-scout.git
 cd part-scout
 npm ci
-cp .env.example .env
 npm run build
 npm start
 ```
 
-On PowerShell, use `Copy-Item .env.example .env` instead of `cp`. Open [localhost:4310](http://localhost:4310). The server binds to loopback by default. For development, use `npm run dev`.
-
-1. Create a monitor with a vehicle model, part name, year range, and ZIP code.
-2. Start with **File import**, or configure an authorized JSON feed.
-3. Import `examples/inventory.json` into a 1986–1988 Mazda RX7 Transmission monitor. Check “complete snapshot” only when the file covers the entire search.
-4. Set `DISCORD_WEBHOOK_URL` in `.env` and restart to enable alerts. Baseline imports are quiet unless “Alert on the first import or scan” is selected.
-
-To browse the sample workspace without touching your real database:
-
-```sh
-npm run demo
-```
-
-Then set `DATABASE_PATH=data/demo.db` in `.env` and restart. The demo is visibly labeled, and its notification worker never sends messages. Switch back to `data/part-scout.db` for real use.
-
-## Inventory sources
-
-### JSON feeds and file imports
-
-The example file documents the format. A feed can return a listing array (a complete snapshot) or `{ "listings": [...], "complete": true }`. Without `complete: true`, an object is treated as partial. Stock, year, model, part, and dealer are required. Unknown numeric values use `null`; zero is a valid price or mileage.
-
-For feeds, set `FEED_HOSTS=inventory.example.com` in `.env`, select **HTTPS JSON feed**, and enter the URL. Only exact allowlisted HTTPS hosts are accepted. Redirects, URL credentials, IP literals, private network addresses, and responses larger than 5 MB are rejected. Configure hosts you own or trust; a feed is not a general-purpose URL fetcher.
-
-### Car-Part
-
-The original project's form submission and results parsing are preserved in a separate adapter. Car-Part's [published terms](https://www.car-part.com/terms.htm) describe manual use and restrict automated access. The adapter is disabled by default. Obtain provider permission before setting `CAR_PART_ENABLED=true`.
-
-You can import a manually saved results HTML page without enabling network access. Seven- and eight-column tables are supported; missing dealer locations do not discard an otherwise valid listing. Unrecognized or partially malformed pages fail without changing inventory. Pages advertising more results are treated as partial, so unseen listings are not aged. **The adapter follows numbered provider pages up to the configured limit (five by default, up to twenty). Capped or unrecognized pagination stays partial; it does not promise full market coverage.** Provider format changes require adapter maintenance. Model and part strings must match the provider's identifiers.
-
-## Discord setup
-
-For channel alerts, create a webhook in the channel settings and put its URL in `DISCORD_WEBHOOK_URL`. It is never returned to the browser or included in configuration exports. Set alert mode and digest window in Settings. A failed delivery remains in Activity; correct the configuration, then choose Retry.
-
-For separate channels, set `DISCORD_WEBHOOKS_JSON` to a JSON object of names and webhook URLs (for example, `{"rx7":"https://discord.com/api/webhooks/...","porsche":"https://discord.com/api/webhooks/..."}`). Choose the destination in each monitor's alert preferences. Replace those example URLs with complete valid webhook URLs. Digests only group alerts for the same destination. `DISCORD_WEBHOOK_URL` supplies the default destination.
-
-For commands:
-
-1. Create an application and bot in the [Discord Developer Portal](https://discord.com/developers/applications).
-2. Set `DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, and comma-separated `DISCORD_USER_IDS` in `.env`. Every command requires both the configured guild and an allowed user ID.
-3. Invite the bot with the `bot` and `applications.commands` scopes. No privileged gateway intents are needed.
-4. Run `npm run bot:register`, then run `npm run bot` beside the server.
-
-The bot calls the same HTTP API as the dashboard. It acknowledges commands before doing longer work. Set `SCOUT_API_URL` and the matching `ADMIN_TOKEN` for a separate server. Remote connections require HTTPS. Webhook alerts and bot commands are independent; neither requires the other.
-
-## Docker
-
-Set `ADMIN_TOKEN` to a random value of at least 24 characters in `.env`, then:
-
-```sh
-docker compose up --build -d
-# Also run the optional command bot:
-docker compose --profile discord up --build -d
-```
-
-The dashboard port is published on loopback. Enter the token when the browser connects. The database lives in the `scout-data` volume. To register Discord commands from the image:
-
-```sh
-docker compose run --rm -e DISCORD_APPLICATION_ID -e DISCORD_BOT_TOKEN -e DISCORD_GUILD_ID scout node dist/register.js
-```
-
-Export those variables in your shell for that command, or use `npm run bot:register` locally. For a remote dashboard, use an HTTPS reverse proxy and retain authentication. Run exactly one server process per database; the command bot uses its API rather than opening SQLite.
-
-## Migrate from car-part-monitor
-
-```sh
-npm run migrate -- /path/to/original-project
-```
-
-Reads the original `monitors.json` and `config.json`, converts each vehicle/part search into a monitor, and leaves imports paused for review. Common hourly, stepped-minute, stepped-hour, and daily schedules become fixed intervals; intervals below 15 minutes are raised to 15. Complex cron schedules are rejected before any write. A fixed interval is not an exact cron wall-clock schedule. Re-running skips existing search names. Existing webhook secrets and the original inventory database are not copied. Export old inventory and use the JSON format if you need historical stock in the new workspace.
-
-## Verify
+Open [localhost:4310](http://localhost:4310). Connections can be entered in the UI. Optional environment configuration is documented in [.env.example](.env.example). The server binds to loopback by default; network binds require an admin token. For Docker and legacy configuration migration, see [operations](docs/operations.md).
 
 ```sh
 npm run check
 npm test
-npm run build
 npx playwright install chromium
 npm run test:browser
-npm run benchmark
+npm run package:win
 ```
 
-Core tests cover transaction rollback, multi-monitor price changes, deduplication, filtering, partial snapshots, stale inventory, durable alerts, Discord rate limits, scan serialization, authentication, import validation, and CSV escaping. Browser tests cover desktop/mobile layouts, search, notes, bookmarks, monitor creation/import/edit/delete, settings, and screenshots. See [architecture](docs/architecture.md) and [operations](docs/operations.md) for behavior and limits.
+The last command builds a portable Windows executable into `release/`. The desktop build uses a bundled server; no external modules are needed at runtime. CI checks types, core behavior, browser workflows, and container packaging. A Windows job builds and smoke-tests the desktop executable.
 
-<details>
-<summary>More screenshots</summary>
+## Documentation
 
-![Monitor configuration](docs/images/monitors.png)
-![Settings](docs/images/settings.png)
-
-</details>
+- [Setup and troubleshooting](docs/setup.md)
+- [Architecture and behavior](docs/architecture.md)
+- [Operations, storage, and migration](docs/operations.md)
+- [Photo sources and background edits](docs/imagery.md)
+- [Review of the original project](docs/original-review.md)
+- [Release history](CHANGELOG.md)
 
 ## Credit
 
-Based on the idea behind [car-part-monitor](https://github.com/dzt/car-part-monitor), created by **Peter Soboyejo (dzt)**. See [NOTICE.md](NOTICE.md) for attribution and [LICENSE](LICENSE) for the MIT license.
+Based on [car-part-monitor](https://github.com/dzt/car-part-monitor), created by **Peter Soboyejo (dzt)**. The original idea and Car-Part form/table format are credited in [NOTICE.md](NOTICE.md). Code is MIT licensed; third-party photographic material retains its source owners' rights and is documented separately.

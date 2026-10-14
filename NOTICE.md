@@ -4,4 +4,4 @@ Part Scout grew from [dzt/car-part-monitor](https://github.com/dzt/car-part-moni
 
 The dashboard, shared service, scheduling, filters, inventory lifecycle, durable notification queue, bot, and deployment tooling are new implementations. The original MIT copyright notice is retained in LICENSE.
 
-Part Scout is independent of Car-Part.com and Discord. The demo contains fictional inventory and recyclers. The fallback part graphics are illustrations, not photographs of listings.
+Part Scout is independent of Car-Part.com, eBay, and Discord. The demo contains fictional inventory and recyclers. Reference part photos are separate from seller listing photos. Sources and background edits are documented in docs/imagery.md; the code's MIT license does not sublicense third-party photography.

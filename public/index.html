@@ -1,34 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-accent="mint">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#f6f7f3" />
-    <title>Part Scout · Inventory monitor</title>
+    <meta name="theme-color" content="#101416" />
+    <title>Part Scout · Your garage</title>
     <link rel="icon" href="/logo.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <aside class="sidebar">
       <a class="brand" href="#overview"
-        ><img src="/logo.svg" width="35" height="35" alt="" /><span
-          >part scout<span class="brand-sub">INVENTORY MONITOR</span></span
+        ><img src="/logo.svg" width="39" height="39" alt="" /><span
+          >part scout<small>YOUR PARTS WORKSPACE</small></span
         ></a
+      ><a class="workspace" href="#garage"
+        ><span class="workspace-avatar">P</span>
+        <div>
+          <span id="garage-name">Your garage</span
+          ><small id="garage-owner">Personal workspace</small>
+        </div>
+        <span>⌄</span></a
       >
-      <div class="workspace">
-        <span class="workspace-avatar">G</span>
-        <div>Your garage<small>Personal workspace</small></div>
-        <span class="workspace-dot"></span>
-      </div>
       <div class="nav-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
-        <a href="#overview" data-nav="overview"><span data-icon="grid"></span>Overview</a>
-        <a href="#inventory" data-nav="inventory"
-          ><span data-icon="box"></span>Inventory<span class="nav-count" id="nav-count">0</span></a
-        >
-        <a href="#monitors" data-nav="monitors"><span data-icon="radar"></span>Monitors</a>
-        <a href="#saved" data-nav="saved"><span data-icon="bookmark"></span>Saved parts</a>
-        <a href="#activity" data-nav="activity"><span data-icon="activity"></span>Activity</a>
+        <a href="#overview" data-nav="overview"><span data-icon="grid"></span>Overview</a
+        ><a href="#garage" data-nav="garage"><span data-icon="car"></span>Your garage</a
+        ><a href="#inventory" data-nav="inventory"
+          ><span data-icon="box"></span>Inventory<span id="nav-count" class="nav-count">0</span></a
+        ><a href="#monitors" data-nav="monitors"><span data-icon="radar"></span>Monitors</a
+        ><a href="#saved" data-nav="saved"><span data-icon="bookmark"></span>Saved parts</a
+        ><a href="#activity" data-nav="activity"><span data-icon="activity"></span>Activity</a>
       </nav>
       <div class="nav-label connections-label">CONNECTIONS</div>
       <a class="discord-nav" href="#settings"
@@ -41,33 +43,34 @@
         <div class="system-status">
           <span class="status-dot"></span>
           <div id="system-status">
-            Connecting…<small id="system-sub">Checking your workspace</small>
+            Connecting…<small id="system-sub">Opening your workspace</small>
           </div>
         </div>
         <a href="#settings" data-nav="settings"><span data-icon="settings"></span>Settings</a>
-        <div class="version">PART SCOUT <span>v1.0.0</span></div>
+        <div class="version">PART SCOUT <span>v2.0.0</span></div>
       </div>
     </aside>
     <main>
       <header class="topbar">
-        <button class="mobile-menu icon-button" aria-label="Toggle navigation" id="mobile-menu">
+        <button class="mobile-menu icon-button" id="mobile-menu" aria-label="Toggle navigation">
           ☰
         </button>
         <div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div>
         <div class="top-actions">
           <span id="demo-label" hidden class="tag">SAMPLE WORKSPACE</span
+          ><span class="live-tag"><span></span> LIVE SYNC</span
           ><button class="icon-button" id="refresh" aria-label="Refresh workspace">
             <span data-icon="refresh"></span></button
-          ><span class="top-avatar">G</span>
+          ><span class="top-avatar">P</span>
         </div>
       </header>
       <div id="content" class="content" aria-live="polite">
-        <div class="empty">Connecting to your garage…</div>
+        <div class="empty">Opening your garage…</div>
       </div>
       <footer>
-        Part Scout <span>Self-hosted inventory monitoring</span
+        Part Scout <span>Local inventory & project tracking</span
         ><a href="https://github.com/dzt/car-part-monitor" target="_blank" rel="noreferrer"
-          >Inspired by car-part-monitor ↗</a
+          >Original concept: Peter Soboyejo ↗</a
         >
       </footer>
     </main>

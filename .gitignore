@@ -8,3 +8,7 @@ coverage/
 .preview/
 test-results/
 playwright-report/
+release/
+desktop/server.cjs
+.vault-key
+uploads/

@@ -1,6 +1,6 @@
 # Architecture
 
-The server, scheduler, and notification worker run in one Node process. The browser is a small native JavaScript application with no client build pipeline. The optional Discord gateway process talks to the server over HTTP. A single-tenant workspace is deliberate: a bot user authorized in the configured guild can control the same workspace as its administrator.
+The server, scheduler, notification worker, and optional Discord gateway run in one process. The Windows app bundles that process and its browser with Electron. The browser edition uses the same small native JavaScript application. A bot user authorized in the configured guild controls the same single-tenant workspace as its administrator.
 
 ```mermaid
 flowchart LR
@@ -19,7 +19,7 @@ flowchart LR
 
 `monitors` stores validated search configuration and persisted schedule state. `listings` stores the current listing, first/last observation, bookmark, and note. `matches` links each listing to each monitor with eligibility, its last observed price, and a missed-snapshot count. `prices` stores price changes; `runs` and `jobs` record operational history. Foreign keys and cascading deletes keep associations consistent. Settings live in `meta`.
 
-A SHA-256 identity covers normalized recycler name, city, state, stock number, vehicle year/model, and part type. This avoids the original stock-plus-dealer collision when one vehicle has several parts. Prices and descriptions do not affect identity. A recycler changing its name or location produces a new identity; there is no reliable provider-wide listing ID in the HTML adapter.
+A provider-wide source ID, when available, defines a listing's SHA-256 identity. Otherwise identity covers normalized recycler name, city, state, stock number, vehicle year/model, and part type. Prices and descriptions do not affect identity. A recycler changing its name or location produces a new identity when the source has no stable ID.
 
 Each import/scan runs in one transaction: upsert listings, record price changes, update monitor associations, enqueue unique alerts, and persist scan state. A failure rolls everything back. Prepared statements are cached; indexed matches, jobs, dates, and price history support bounded reads. The UI paginates at 30 records. Inventory export collects all matching records and is intended for personal-scale workspaces.
 
@@ -39,7 +39,9 @@ Jobs move from pending to sending to sent. Network failures and rate limits retu
 
 ## Security boundaries
 
-Loopback is the default. A network bind requires a sufficiently long admin token; all API endpoints except health require it. Browser sessions hold the token in memory. Origin checks reject cross-site API calls, CSP restricts script execution, listing text is escaped, embeds disable mentions, and CSV exports neutralize formula prefixes. Environment secrets never appear in API responses or normal exports. Feed URLs are administrator data: avoid putting secrets in their query strings because configuration exports include those URLs.
+Loopback is the default. A network bind requires a sufficiently long admin token. The desktop app uses a random token and an ephemeral local port; only its trusted UI session receives that token. Seller windows have no Node access, no app preload, and a separate browser session. UI credentials use Windows safe storage when available; the server fallback uses AES-GCM and a local private key file. Secrets never appear in public API metadata or configuration exports.
+
+Origin checks reject cross-site API calls, CSP restricts script execution, listing text is escaped, and CSV exports neutralize formula prefixes. Discord mentions are disabled except for the one explicitly configured phone-alert user. Feed URLs are administrator data: avoid secrets in query strings because configuration exports include those URLs.
 
 Feeds require exact configured hosts and public DNS addresses; redirects and credential-bearing URLs are rejected. Hostnames must be trusted and under stable administration. DNS validation is not a substitute for an outbound firewall in hostile environments. The Car-Part target and Discord webhook host are fixed. Bot access is restricted to the configured guild and explicit user IDs; replies are ephemeral.
 
@@ -49,5 +51,5 @@ Feeds require exact configured hosts and public DNS addresses; redirects and cre
 - No accounts, billing, team roles, or multi-guild tenant separation.
 - Provider results are not independently verified; fitment and availability still require recycler confirmation.
 - The Car-Part adapter follows recognized numbered pages up to the monitor limit. Capped or unrecognized pagination stays partial. Tests use synthetic fixtures, not a live permission-backed end-to-end run.
-- Discord commands are implemented and exercised through the shared API, but live bot registration and webhook delivery need your credentials.
+- Discord commands and API-backed listings require your account credentials. Fixture checks do not replace a live connection test.
 - Health reports process readiness. Provider failures and alert delivery failures are visible in Activity, not hidden by a green health endpoint.
