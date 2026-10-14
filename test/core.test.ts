@@ -372,3 +372,43 @@ test('authorized adapter follows provider pages and marks page-limit results par
     store.close();
   }
 });
+test('Discord digests never mix destinations or expose webhook URLs in payloads', async () => {
+  const { store, m } = setup();
+  const urls: string[] = [];
+  try {
+    store.setSettings({ ...store.settings(), notificationMode: 'digest' });
+    const other = store.putMonitor(config({ name: 'Other channel', destination: 'parts' }));
+    for (const monitor of [m, other]) {
+      store.ingest(monitor, [part()], Date.now(), 0);
+      store.ingest(store.monitor(monitor.id)!, [part({ price: 400 })], Date.now(), 0);
+    }
+    store.exec('UPDATE jobs SET due=0');
+    const worker = new Notifications(
+      store,
+      '',
+      async (url, options) => {
+        urls.push(String(url));
+        const body = JSON.parse(String(options?.body));
+        assert.equal(body.embeds.length, 1);
+        assert.equal(String(options?.body).includes('/webhooks/'), false);
+        return new Response('{}');
+      },
+      {
+        default: 'https://discord.com/api/webhooks/123/default',
+        parts: 'https://discord.com/api/webhooks/456/parts',
+      },
+    );
+    await worker.tick();
+    await worker.tick();
+    assert.deepEqual(urls, [
+      'https://discord.com/api/webhooks/123/default?wait=true',
+      'https://discord.com/api/webhooks/456/parts?wait=true',
+    ]);
+    assert.equal(
+      store.jobs().every((j) => j.status === 'sent'),
+      true,
+    );
+  } finally {
+    store.close();
+  }
+});

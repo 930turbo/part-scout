@@ -258,6 +258,7 @@ export class Store {
             JSON.stringify({
               kind,
               monitor: m.name,
+              destination: m.destination ?? 'default',
               listing: l,
               previousPrice: previousMatch?.observed_price ?? null,
             }),

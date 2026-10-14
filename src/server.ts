@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
 import { Store } from './store.js';
 import { Service } from './service.js';
-import { Notifications, validWebhook } from './notifications.js';
+import { Notifications, webhookDestinations } from './notifications.js';
 import { listingSchema, monitorSchema, settingsSchema } from './model.js';
 import { parseCarPart } from './providers.js';
 
@@ -78,11 +78,12 @@ export function createApp(store: Store, service: Service, token = process.env.AD
       )!.pending,
       failedDeliveries: store.get("SELECT COUNT(*) failed FROM jobs WHERE status='failed'")!.failed,
       integrations: {
-        webhook: validWebhook(process.env.DISCORD_WEBHOOK_URL || ''),
+        webhook: Object.keys(webhookDestinations()).length > 0,
         carpart: process.env.CAR_PART_ENABLED === 'true',
         feeds: !!process.env.FEED_HOSTS,
         bot: !!process.env.DISCORD_BOT_TOKEN,
       },
+      destinations: Object.keys(webhookDestinations()),
       version: '1.0.0',
     }),
   );
@@ -187,15 +188,13 @@ export function createApp(store: Store, service: Service, token = process.env.AD
     res.json(store.settings());
   });
   app.get('/api/export/config', (_, res) =>
-    res
-      .attachment('part-scout-config.json')
-      .json({
-        version: 1,
-        settings: store.settings(),
-        monitors: store
-          .monitors()
-          .map(({ id, lastRun, nextRun, error, failures, initialized, ...config }) => config),
-      }),
+    res.attachment('part-scout-config.json').json({
+      version: 1,
+      settings: store.settings(),
+      monitors: store
+        .monitors()
+        .map(({ id, lastRun, nextRun, error, failures, initialized, ...config }) => config),
+    }),
   );
   app.post('/api/import/config', (req, res) => {
     if (service.running !== null)
@@ -251,11 +250,9 @@ export function createApp(store: Store, service: Service, token = process.env.AD
   app.use(express.static(resolve('public'), { maxAge: 0 }));
   app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (err?.name === 'ZodError')
-      return res
-        .status(400)
-        .json({
-          error: err.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join('; '),
-        });
+      return res.status(400).json({
+        error: err.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join('; '),
+      });
     const message = err instanceof Error ? err.message : 'Request failed';
     res
       .status(err.status || (message === 'Monitor not found' ? 404 : 400))

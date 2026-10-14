@@ -58,6 +58,10 @@ export const monitorSchema = z
     notifyInitial: z.boolean().default(false),
     notifyNew: z.boolean().default(true),
     notifyDrops: z.boolean().default(true),
+    destination: z
+      .string()
+      .regex(/^[a-zA-Z0-9_-]{1,40}$/)
+      .default('default'),
   })
   .refine((m) => m.yearEnd >= m.yearStart, {
     message: 'Ending year must be at least the starting year.',

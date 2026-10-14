@@ -6,6 +6,7 @@ services:
     environment:
       ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN to a random value of at least 24 characters}
       DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      DISCORD_WEBHOOKS_JSON: ${DISCORD_WEBHOOKS_JSON:-}
       CAR_PART_ENABLED: ${CAR_PART_ENABLED:-false}
       FEED_HOSTS: ${FEED_HOSTS:-}
     volumes: ['scout-data:/app/data']

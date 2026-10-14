@@ -10,6 +10,7 @@
 | `FEED_HOSTS`             | Comma-separated exact allowed HTTPS feed hosts              |
 | `CAR_PART_ENABLED`       | `true` enables permission-backed provider access            |
 | `DISCORD_WEBHOOK_URL`    | Destination for inventory alerts                            |
+| `DISCORD_WEBHOOKS_JSON`  | Optional JSON object of named channel webhooks              |
 | `DISCORD_BOT_TOKEN`      | Gateway bot credential                                      |
 | `DISCORD_APPLICATION_ID` | Application ID for command registration                     |
 | `DISCORD_GUILD_ID`       | Single guild allowed to use the bot                         |

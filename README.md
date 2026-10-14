@@ -62,6 +62,8 @@ You can import a manually saved results HTML page without enabling network acces
 
 For channel alerts, create a webhook in the channel settings and put its URL in `DISCORD_WEBHOOK_URL`. It is never returned to the browser or included in configuration exports. Set alert mode and digest window in Settings. A failed delivery remains in Activity; correct the configuration, then choose Retry.
 
+For separate channels, set `DISCORD_WEBHOOKS_JSON` to a JSON object of names and webhook URLs (for example, `{"rx7":"https://discord.com/api/webhooks/...","porsche":"https://discord.com/api/webhooks/..."}`). Choose the destination in each monitor's alert preferences. Replace those example URLs with complete valid webhook URLs. Digests only group alerts for the same destination. `DISCORD_WEBHOOK_URL` supplies the default destination.
+
 For commands:
 
 1. Create an application and bot in the [Discord Developer Portal](https://discord.com/developers/applications).

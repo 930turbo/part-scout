@@ -420,7 +420,7 @@ function editor(id) {
       )
       .join(
         '',
-      )}</select></label><label class="field">Feed URL<input name="feedUrl" value="${esc(m.feedUrl)}" placeholder="https://inventory.example.com/feed"><small>Feed host must be in FEED_HOSTS.</small></label><div class="form-section full">Alert preferences</div>${[
+      )}</select></label><label class="field">Feed URL<input name="feedUrl" value="${esc(m.feedUrl)}" placeholder="https://inventory.example.com/feed"><small>Feed host must be in FEED_HOSTS.</small></label><div class="form-section full">Alert preferences</div><label class="field full">Discord destination<select name="destination">${[...new Set(['default', ...(status.destinations || []), m.destination || 'default'])].map((name) => `<option value="${esc(name)}" ${name === (m.destination || 'default') ? 'selected' : ''}>${esc(name)}${status.destinations?.includes(name) ? '' : ' (not configured)'}</option>`).join('')}</select><small>Webhook credentials stay on the server.</small></label>${[
       ['enabled', 'Enable scheduled scans'],
       ['allowUnknownPrice', 'Include unknown prices'],
       ['allowUnknownMiles', 'Include unknown mileage'],
@@ -448,7 +448,7 @@ function editor(id) {
             ? null
             : Number(form.get(name))
           : form.get(name);
-    for (const name of ['provider', 'feedUrl']) config[name] = form.get(name);
+    for (const name of ['provider', 'feedUrl', 'destination']) config[name] = form.get(name);
     for (const name of [
       'enabled',
       'allowUnknownPrice',

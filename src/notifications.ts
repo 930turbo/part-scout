@@ -14,6 +14,35 @@ export function validWebhook(raw: string) {
     return false;
   }
 }
+export function webhookDestinations(
+  defaultUrl = process.env.DISCORD_WEBHOOK_URL || '',
+): Record<string, string> {
+  const destinations: Record<string, string> = Object.create(null);
+  if (process.env.DISCORD_WEBHOOKS_JSON) {
+    let entries: unknown;
+    try {
+      entries = JSON.parse(process.env.DISCORD_WEBHOOKS_JSON);
+    } catch {
+      throw new Error(
+        'DISCORD_WEBHOOKS_JSON must be a JSON object of destination names and webhook URLs.',
+      );
+    }
+    if (
+      !entries ||
+      typeof entries !== 'object' ||
+      Array.isArray(entries) ||
+      Object.keys(entries).length > 50
+    )
+      throw new Error('Configure at most 50 named Discord destinations.');
+    for (const [name, url] of Object.entries(entries)) {
+      if (!/^[a-zA-Z0-9_-]{1,40}$/.test(name) || typeof url !== 'string' || !validWebhook(url))
+        throw new Error('Each Discord destination needs a valid name and Discord webhook URL.');
+      destinations[name] = url;
+    }
+  }
+  if (validWebhook(defaultUrl)) destinations.default = defaultUrl;
+  return destinations;
+}
 const money = (n: number | null) =>
   n === null
     ? 'Ask for price'
@@ -60,22 +89,42 @@ export class Notifications {
   running = false;
   constructor(
     private store: Store,
-    private url = process.env.DISCORD_WEBHOOK_URL || '',
+    url = process.env.DISCORD_WEBHOOK_URL || '',
     private request: typeof fetch = fetch,
+    private destinations: Record<string, string> = webhookDestinations(url),
   ) {}
   async tick() {
     if (
       this.running ||
-      !this.url ||
+      !Object.keys(this.destinations).length ||
       this.store.settings().notificationMode === 'off' ||
       this.store.get("SELECT value FROM meta WHERE key='demo'")?.value === 'true'
     )
       return;
-    if (!validWebhook(this.url)) return;
     this.running = true;
-    const jobs = this.store.all(
-      "SELECT * FROM jobs WHERE status='pending' AND due<=? ORDER BY id LIMIT ?",
+    const first = this.store.get(
+      "SELECT * FROM jobs WHERE status='pending' AND due<=? ORDER BY id LIMIT 1",
       Date.now(),
+    );
+    if (!first) {
+      this.running = false;
+      return;
+    }
+    const destination = JSON.parse(first.payload).destination || 'default';
+    const url = this.destinations[destination];
+    if (!url) {
+      this.store.exec(
+        "UPDATE jobs SET status='failed',error=? WHERE id=?",
+        'Discord destination is not configured. Restore it, then retry.',
+        first.id,
+      );
+      this.running = false;
+      return;
+    }
+    const jobs = this.store.all(
+      "SELECT * FROM jobs WHERE status='pending' AND due<=? AND COALESCE(json_extract(payload,'$.destination'),'default')=? ORDER BY id LIMIT ?",
+      Date.now(),
+      destination,
       this.store.settings().notificationMode === 'digest' ? 10 : 1,
     );
     try {
@@ -85,7 +134,9 @@ export class Notifications {
           this.store.exec("UPDATE jobs SET status='sending',attempts=attempts+1 WHERE id=?", j.id);
       });
       try {
-        const response = await this.request(`${this.url}?wait=true`, {
+        const endpoint = new URL(url);
+        endpoint.searchParams.set('wait', 'true');
+        const response = await this.request(endpoint.toString(), {
           method: 'POST',
           redirect: 'error',
           signal: AbortSignal.timeout(15000),

@@ -60,24 +60,22 @@ test('monitor creation, inventory import, editing and deletion', async ({ page }
   const monitor = page.locator('.monitor-card').filter({ hasText: 'Test Miata' });
   await expect(monitor).toBeVisible();
   await monitor.getByRole('button', { name: 'Import inventory' }).click();
-  await page
-    .getByLabel('Inventory file')
-    .setInputFiles({
-      name: 'inventory.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(
-        JSON.stringify([
-          {
-            stock: 'TEST1',
-            year: 2001,
-            model: 'Mazda Miata',
-            part: 'Hood',
-            dealer: 'Fixture Recycler',
-            price: 250,
-          },
-        ]),
-      ),
-    });
+  await page.getByLabel('Inventory file').setInputFiles({
+    name: 'inventory.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify([
+        {
+          stock: 'TEST1',
+          year: 2001,
+          model: 'Mazda Miata',
+          part: 'Hood',
+          dealer: 'Fixture Recycler',
+          price: 250,
+        },
+      ]),
+    ),
+  });
   await page.getByRole('button', { name: 'Import inventory', exact: true }).last().click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await monitor.getByRole('button', { name: 'Edit search' }).click();
