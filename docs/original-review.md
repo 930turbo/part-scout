@@ -1,6 +1,6 @@
 # Review of the original project
 
-Reviewed source: [dzt/car-part-monitor](https://github.com/dzt/car-part-monitor). The original program compiles TypeScript at startup, loads local configuration, creates per-vehicle cron jobs, posts search forms to Car-Part, inserts unseen stock into SQLite, and sends Discord embeds through an in-memory queue.
+Reviewed source: [dzt/car-part-monitor at 8b52e84](https://github.com/dzt/car-part-monitor/tree/8b52e848dc5ab812a37c71175f3f356e1c52abce). The original program compiles TypeScript at startup, loads local configuration, creates per-vehicle cron jobs, posts search forms to Car-Part, inserts unseen stock into SQLite, and sends Discord embeds through an in-memory queue.
 
 The request form supports direct searches, explicit year ranges, and interchange choices resolved from radio labels. Results are read from seven- or eight-column HTML tables. Each monitor searches a vehicle/part/variant combination; each vehicle supplies one cron schedule and webhook destination. A setup script populates vehicles and monitors from JSON. Dealers and parts are shared in the database.
 

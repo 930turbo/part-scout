@@ -40,6 +40,6 @@ Retention runs hourly. Delivered/failed alerts and scan history expire after the
 
 ## Release validation
 
-CI type-checks, runs unit/integration tests, compiles the server, and exercises the UI in Chromium. Browser tests use a disposable sample database under `.preview`; they never use the real workspace database. `npm run benchmark` uses an in-memory 10,000-listing fixture and reports timings for the current machine. It measures local processing, not provider latency or a speedup against the original project.
+CI type-checks, runs unit/integration tests, compiles the server, exercises the UI in Chromium, and builds the Docker image. Browser tests use a disposable sample database under `.preview`; they never use the real workspace database. `npm run benchmark` uses an in-memory 10,000-listing fixture and reports timings for the current machine. It measures local processing, not provider latency or a speedup against the original project.
 
 Use `npm audit` when updating dependencies. The Docker setup runs as a non-root user. Keep the server single-process, protect network access with HTTPS, and apply OS backups/updates appropriate to the host.
